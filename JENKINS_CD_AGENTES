@@ -1,0 +1,48 @@
+pipeline{
+    agent none
+    
+    stages{
+        stage('Get Code'){
+            agent any
+            steps{
+                sh '''
+                    hostname
+                    whoami
+                '''
+                 git branch: 'master', url: 'https://github.com/marcusroses/TODO-LIST-AWS.git'
+            }
+        }
+        
+        stage('Deploy'){
+            agent any
+            steps{
+                sh '''
+                    hostname
+                    whoami
+                '''                
+                sh 'sam build'
+                sh 'sam deploy --config-env production --no-fail-on-empty-changeset'
+                sh '''
+                    BASE_URL=$(aws cloudformation describe-stacks --stack-name todo-list-aws-production --query 'Stacks[0].Outputs[?OutputKey==`BaseUrlApi`].OutputValue' --output text)
+                    echo "BASE_URL=$BASE_URL" > env2.properties
+                    echo "La URL de la API es: $BASE_URL"
+                '''
+                stash(name: 'codigosamdeploy')
+
+            }            
+        } 
+        
+        stage('Rest Test'){
+            agent { label 'agente2'}
+            steps{
+                sh '''
+                    hostname
+                    whoami
+                '''                
+                unstash 'codigosamdeploy'
+                sh 'ls'
+                sh '/home/ubuntu/todo-aws-list/venv/bin/pytest --junitxml=result-rest.xml test/integration/todoApiTest2.py'
+            }
+        }
+    }
+}
